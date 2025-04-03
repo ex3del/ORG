@@ -3,3 +3,6 @@ uvicorn==0.29.0
 black==24.3.0
 sqlalchemy==1.4.46
 psycopg2-binary==2.9.5
+passlib[bcrypt]==1.7.4 
+pyjwt==2.4.0           
+python-multipart==0.0.20
