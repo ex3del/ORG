@@ -1,6 +1,23 @@
 version: '3.8'
 
 services:
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: mydatabase
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U myuser -d mydatabase" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always # Автоматический перезапуск
+
   backend:
     build: ./backend
     ports:
@@ -9,6 +26,10 @@ services:
       - ./backend/app:/app/app
     environment:
       - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: always # Автоматический перезапуск
 
   frontend:
     build: ./frontend
@@ -16,6 +37,10 @@ services:
       - "3000:3000"
     volumes:
       - ./frontend:/app
-      - /app/node_modules # Avoid overwriting node_modules
+      - /app/node_modules
     environment:
-      - CHOKIDAR_USEPOLLING=true # Enable hot reloading
+      - CHOKIDAR_USEPOLLING=true
+    restart: always # Автоматический перезапуск
+
+volumes:
+  postgres_data:
