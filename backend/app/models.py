@@ -1,7 +1,46 @@
+"""
+Модуль ORM-моделей для системы управления пользователями, документами и чат-сессиями.
+
+Модели:
+    - User: Модель пользователя системы
+    - Document: Модель загруженных документов
+    - ChatSession: Модель чат-сессий пользователя
+    - Message: Модель сообщений в чат-сессиях
+
+Пример использования:
+    # Создание нового пользователя
+    new_user = User(
+        username="john_doe",
+        email="john@example.com",
+        hashed_password="hashed_password_here"
+    )
+
+    # Добавление документа для пользователя
+    user_document = Document(
+        user_id=new_user.id,
+        file_name="report.pdf",
+        file_path="/uploads/report.pdf"
+    )
+
+    # Создание чат-сессии
+    chat_session = ChatSession(
+        user_id=new_user.id,
+        session_name="Technical Support"
+    )
+
+    # Добавление сообщения в сессию
+    message = Message(
+        session_id=chat_session.id,
+        message_text="Hello, I need help",
+        is_user=True
+    )
+"""
+
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from .database import Base
 from datetime import datetime
+
 
 class User(Base):
     __tablename__ = "users"
@@ -17,6 +56,7 @@ class User(Base):
     documents = relationship("Document", back_populates="user")
     chat_sessions = relationship("ChatSession", back_populates="user")
 
+
 class Document(Base):
     __tablename__ = "documents"
 
@@ -28,6 +68,7 @@ class Document(Base):
 
     user = relationship("User", back_populates="documents")
 
+
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
 
@@ -38,6 +79,7 @@ class ChatSession(Base):
 
     user = relationship("User", back_populates="chat_sessions")
     messages = relationship("Message", back_populates="session")
+
 
 class Message(Base):
     __tablename__ = "messages"
