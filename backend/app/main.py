@@ -5,6 +5,7 @@
 - Регистрация и вход пользователей
 - Аутентификация на основе JWT-токенов
 - Базовые операции управления пользователями
+- Загрузка и управление документами
 - Интеграция с SQLAlchemy для работы с базой данных
 
 Конечные точки (Endpoints):
@@ -14,10 +15,15 @@
    - POST /register - Регистрация нового пользователя
    - POST /login - Аутентификация и получение JWT-токена
    - GET /users/me - Получение информации о текущем пользователе
+   - POST /approve_user/{user_id} - Одобрение учетной записи пользователя
+3. Управление документами:
+   - POST /upload - Загрузка документа (PDF, ≤20MB, максимум 10 документов на пользователя)
+   - GET /documents - Список всех документов текущего пользователя
+   - DELETE /documents/{doc_id} - удаляет документ текущего пользователя
 
 Модели:
 - User: Хранит учетные данные и информацию о пользователях
-- Document: (Импортируется, но не используется в этих конечных точках)
+- Document: Хранит информацию о загруженных документах
 - ChatSession: (Импортируется, но не используется в этих конечных точках)
 - Message: (Импортируется, но не используется в этих конечных точках)
 
@@ -28,7 +34,7 @@
 - Утилиты безопасности FastAPI
 """
 
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm
 from .database import engine, Base, get_db
 from .models import (
@@ -41,6 +47,10 @@ from sqlalchemy.orm import Session
 from . import models, schemas, auth, database
 from typing import List
 import logging
+import os
+import shutil
+
+UPLOAD_DIR = "/app/uploads"
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -207,3 +217,132 @@ def approve_user(
     db.commit()
     db.refresh(user)
     return user
+
+
+@app.post("/upload", response_model=schemas.Document)
+def upload_document(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    POST /upload
+    Загрузка документа для текущего пользователя.
+
+    Описание:
+        Этот эндпоинт позволяет аутентифицированному пользователю загружать PDF-документы.
+        Максимальный размер файла: 20MB. Максимум 10 документов на пользователя.
+
+    Аргументы:
+        file (UploadFile): Загружаемый файл.
+        db (Session): Сессия базы данных для выполнения запросов.
+        current_user (models.User): Аутентифицированный пользователь из JWT-токена.
+
+    Возвращает:
+        models.Document: Объект загруженного документа.
+
+    Ошибки:
+        HTTPException 400: Если превышен лимит документов, размер файла превышает 20MB или файл не является PDF.
+    """
+    doc_count = (
+        db.query(models.Document)
+        .filter(models.Document.user_id == current_user.id)
+        .count()
+    )
+    if doc_count >= 10:
+        raise HTTPException(
+            status_code=400, detail="Document limit reached (10 per user)"
+        )
+
+    if file.size > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size exceeds 20MB limit")
+
+    if not file.filename.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+
+    user_dir = os.path.join(UPLOAD_DIR, f"user_{current_user.id}")
+    os.makedirs(user_dir, exist_ok=True)
+
+    file_path = os.path.join(user_dir, file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    new_doc = models.Document(
+        user_id=current_user.id, file_name=file.filename, file_path=file_path
+    )
+    db.add(new_doc)
+    db.commit()
+    db.refresh(new_doc)
+    return new_doc
+
+
+@app.get("/documents", response_model=List[schemas.Document])
+def list_documents(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    GET /documents
+    Получение списка всех документов текущего пользователя.
+
+    Описание:
+        Этот эндпоинт возвращает список всех загруженных документов для текущего аутентифицированного пользователя.
+
+    Аргументы:
+        db (Session): Сессия базы данных для выполнения запросов.
+        current_user (models.User): Аутентифицированный пользователь из JWT-токена.
+
+    Возвращает:
+        List[models.Document]: Список объектов документов текущего пользователя.
+    """
+    documents = (
+        db.query(models.Document)
+        .filter(models.Document.user_id == current_user.id)
+        .all()
+    )
+    return documents
+
+
+@app.delete("/documents/{doc_id}", response_model=schemas.Document)
+def delete_document(
+    doc_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    DELETE /documents/{doc_id}
+    Удаление документа текущего пользователя.
+
+    Описание:
+        Этот эндпоинт позволяет аутентифицированному пользователю удалить загруженный документ.
+        Документ удаляется как из базы данных, так и из файловой системы.
+
+    Аргументы:
+        doc_id (int): Идентификатор документа, который нужно удалить.
+        db (Session): Сессия базы данных для выполнения запросов.
+        current_user (models.User): Аутентифицированный пользователь из JWT-токена.
+
+    Возвращает:
+        models.Document: Объект удаленного документа.
+
+    Ошибки:
+        HTTPException 404: Если документ не найден или не принадлежит текущему пользователю.
+    """
+    document = (
+        db.query(models.Document)
+        .filter(
+            models.Document.id == doc_id, models.Document.user_id == current_user.id
+        )
+        .first()
+    )
+    if not document:
+        raise HTTPException(
+            status_code=404, detail="Document not found or not owned by user"
+        )
+
+    if os.path.exists(document.file_path):
+        os.remove(document.file_path)
+
+    db.delete(document)
+    db.commit()
+    return document

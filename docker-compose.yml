@@ -24,6 +24,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend/app:/app/app
+      - ./backend/uploads:/app/uploads
     environment:
       - PYTHONUNBUFFERED=1
     env_file:
