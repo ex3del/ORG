@@ -30,7 +30,7 @@ def read_current_user(current_user: User = Depends(get_current_user)):
 """
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import jwt
 from passlib.context import CryptContext
@@ -53,16 +53,45 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 
 def get_password_hash(password: str) -> str:
+    """
+    Функция для хеширования паролей.
+
+    Аргументы:
+        password (str): Пароль в виде строки.
+
+    Возвращает:
+        str: Хешированный пароль.
+    """
     return pwd_context.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """
+    Функция для проверки пароля.
+
+    Аргументы:
+        plain_password (str): Обычный пароль.
+        hashed_password (str): Хешированный пароль.
+
+    Возвращает:
+        bool: True, если пароль совпадает, иначе False.
+    """
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """
+    Функция для создания JWT-токена.
+
+    Аргументы:
+        data (dict): Данные для включения в токен.
+        expires_delta (Optional[timedelta]): Время жизни токена. Если не указано, используется значение по умолчанию.
+
+    Возвращает:
+        str: Сгенерированный JWT-токен.
+    """
     to_encode = data.copy()
-    expire = datetime.now(datetime.timezone.utc) + (
+    expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire})
@@ -72,6 +101,19 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 def get_current_user(
     token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)
 ) -> models.User:
+    """
+    Функция для получения текущего пользователя на основе токена.
+
+    Аргументы:
+        token (str): JWT-токен, извлеченный из заголовков.
+        db (Session): Сессия базы данных.
+
+    Возвращает:
+        models.User: Объект пользователя из базы данных.
+
+    Вызывает:
+        HTTPException: Если токен недействителен или пользователь не найден.
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -88,3 +130,23 @@ def get_current_user(
     if not user:
         raise credentials_exception
     return user
+
+
+def get_current_admin_user(current_user: models.User = Depends(get_current_user)):
+    """
+    Функция для проверки, является ли текущий пользователь администратором.
+
+    Аргументы:
+        current_user (models.User): Текущий пользователь, извлеченный из токена.
+
+    Возвращает:
+        models.User: Объект пользователя, если он администратор.
+
+    Вызывает:
+        HTTPException: Если пользователь не является администратором.
+    """
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=403, detail="Not authorized to perform this action"
+        )
+    return current_user

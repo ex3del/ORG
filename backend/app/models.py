@@ -43,6 +43,22 @@ from datetime import datetime
 
 
 class User(Base):
+    """
+    Класс User представляет пользователя системы.
+
+    Атрибуты:
+        id (int): Уникальный идентификатор пользователя.
+        username (str): Уникальное имя пользователя.
+        email (str): Уникальный адрес электронной почты пользователя.
+        hashed_password (str): Хешированный пароль пользователя.
+        is_active (bool): Флаг активности пользователя (по умолчанию True).
+        is_approved (bool): Флаг одобрения учетной записи (по умолчанию False).
+        created_at (datetime): Дата и время создания учетной записи.
+        is_admin (bool): Флаг, указывающий, является ли пользователь администратором (по умолчанию False).
+        documents (relationship): Связь с документами пользователя.
+        chat_sessions (relationship): Связь с чат-сессиями пользователя.
+    """
+
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -52,12 +68,25 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_approved = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    is_admin = Column(Boolean, default=False)
 
     documents = relationship("Document", back_populates="user")
     chat_sessions = relationship("ChatSession", back_populates="user")
 
 
 class Document(Base):
+    """
+    Класс Document представляет загруженные документы пользователя.
+
+    Атрибуты:
+        id (int): Уникальный идентификатор документа.
+        user_id (int): Идентификатор пользователя, загрузившего документ.
+        file_name (str): Имя файла документа.
+        file_path (str): Путь к файлу документа.
+        uploaded_at (datetime): Дата и время загрузки документа.
+        user (relationship): Связь с пользователем, загрузившим документ.
+    """
+
     __tablename__ = "documents"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -70,6 +99,18 @@ class Document(Base):
 
 
 class ChatSession(Base):
+    """
+    Класс ChatSession представляет чат-сессии пользователя.
+
+    Атрибуты:
+        id (int): Уникальный идентификатор чат-сессии.
+        user_id (int): Идентификатор пользователя, создавшего чат-сессию.
+        session_name (str): Название чат-сессии.
+        created_at (datetime): Дата и время создания чат-сессии.
+        user (relationship): Связь с пользователем, создавшим чат-сессию.
+        messages (relationship): Связь с сообщениями в чат-сессии.
+    """
+
     __tablename__ = "chat_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -82,6 +123,18 @@ class ChatSession(Base):
 
 
 class Message(Base):
+    """
+    Класс Message представляет сообщения в чат-сессиях.
+
+    Атрибуты:
+        id (int): Уникальный идентификатор сообщения.
+        session_id (int): Идентификатор чат-сессии, к которой относится сообщение.
+        message_text (str): Текст сообщения.
+        timestamp (datetime): Дата и время отправки сообщения.
+        is_user (bool): Флаг, указывающий, является ли сообщение пользовательским (True) или ботом (False).
+        session (relationship): Связь с чат-сессией, к которой относится сообщение.
+    """
+
     __tablename__ = "messages"
 
     id = Column(Integer, primary_key=True, index=True)
