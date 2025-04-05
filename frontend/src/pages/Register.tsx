@@ -37,9 +37,30 @@ const Register: React.FC = () => {
             return;
         }
 
-        // TODO: Implement actual registration logic
-        alert('Registration successful');
-        navigate('/login');
+        try {
+            const response = await fetch('/api/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username,
+                    email,
+                    password,
+                }),
+            });
+
+            if (response.ok) {
+                alert('Registration successful');
+                navigate('/login');
+            } else {
+                const errorData = await response.json();
+                alert(errorData.detail || 'Registration failed');
+            }
+        } catch (error) {
+            console.error('Registration error:', error);
+            alert('An error occurred during registration');
+        }
     };
 
     return (

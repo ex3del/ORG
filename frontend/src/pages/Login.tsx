@@ -25,12 +25,30 @@ const Login: React.FC = () => {
             return;
         }
 
-        // TODO: Implement actual login logic
-        if (username === 'admin' && password === 'password') {
-            alert('Login successful');
-            navigate('/dashboard');
-        } else {
-            alert('Invalid credentials');
+        try {
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    username: username,
+                    password: password,
+                }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                localStorage.setItem('token', data.access_token);
+                alert('Login successful');
+                navigate('/dashboard');
+            } else {
+                const errorData = await response.json();
+                alert(errorData.detail || 'Login failed');
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            alert('An error occurred during login');
         }
     };
 

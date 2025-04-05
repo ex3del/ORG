@@ -16,7 +16,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    restart: always # Автоматический перезапуск
+    restart: always
+    networks:
+      - app-network
 
   backend:
     build: ./backend
@@ -27,26 +29,29 @@ services:
       - ./backend/uploads:/app/uploads
     environment:
       - PYTHONUNBUFFERED=1
+      - JWT_SECRET_KEY=your_jwt_secret_key_here # Add this line
     env_file:
       - .env
     depends_on:
       db:
         condition: service_healthy
-    restart: always # Автоматический перезапуск
+    restart: always
+    networks:
+      - app-network
 
   frontend:
     build: ./frontend
     ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    environment:
-      - NODE_ENV=production
-      - REACT_APP_API_URL=http://localhost:8000
+      - "80:80"
+    networks:
+      - app-network
     depends_on:
       - backend
     restart: always
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   postgres_data:
