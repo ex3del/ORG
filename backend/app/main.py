@@ -500,3 +500,49 @@ def delete_chat_session(
     db.delete(chat)
     db.commit()
     return chat
+
+
+@app.get("/view/{file_path:path}")
+async def view_document(
+    file_path: str,
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    GET /view/{file_path}
+    Stream a document file for viewing.
+
+    Description:
+        This endpoint allows an authenticated user to view their uploaded documents.
+        It validates that the requested document belongs to the current user.
+
+    Arguments:
+        file_path (str): The path to the document file.
+        current_user (models.User): The authenticated user from JWT token.
+
+    Returns:
+        FileResponse: The document file as a stream.
+
+    Errors:
+        HTTPException 404: If the document is not found or doesn't belong to the user.
+    """
+    # Convert the URL-encoded path back to a normal path
+    from fastapi.responses import FileResponse
+    from fastapi import HTTPException
+    import os
+
+    # Ensure the file exists and is within the user's directory
+    user_dir = os.path.join(UPLOAD_DIR, f"user_{current_user.id}")
+    full_path = os.path.join(UPLOAD_DIR, file_path)
+
+    # Security check - ensure the file is within the user's directory
+    if not os.path.commonprefix([os.path.abspath(full_path), user_dir]).startswith(
+        user_dir
+    ):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return FileResponse(
+        full_path, media_type="application/pdf", filename=os.path.basename(file_path)
+    )

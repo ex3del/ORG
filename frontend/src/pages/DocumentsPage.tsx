@@ -191,8 +191,10 @@ const DocumentsPage: React.FC = () => {
 
     const viewDocument = async (filePath: string) => {
         try {
+            // Remove /app prefix if it exists since it's only used in the container
+            const cleanPath = filePath.replace('/app/', '');
             const token = localStorage.getItem('token');
-            const response = await fetch(`/api/view/${filePath}`, {
+            const response = await fetch(`/api/view/${cleanPath}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -202,6 +204,14 @@ const DocumentsPage: React.FC = () => {
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 window.open(url, '_blank');
+            } else {
+                toast({
+                    title: "Error",
+                    description: "Failed to open document",
+                    status: "error",
+                    duration: 3000,
+                    isClosable: true,
+                });
             }
         } catch (error) {
             console.error('Error viewing document:', error);
