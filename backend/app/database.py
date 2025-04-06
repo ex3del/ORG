@@ -1,28 +1,39 @@
 """
-Модуль для настройки подключения к базе данных через SQLAlchemy.
+Модуль конфигурации базы данных PostgreSQL.
+
+Этот модуль предоставляет базовую настройку и подключение к PostgreSQL через SQLAlchemy.
 
 Компоненты:
-    - SQLALCHEMY_DATABASE_URL: URL подключения к БД
-    - engine: Движок SQLAlchemy для управления подключениями
-    - SessionLocal: Фабрика для создания сессий БД
-    - Base: Базовый класс для ORM-моделей
-    - get_db(): Генератор сессий для dependency injection
+    1. Конфигурация подключения:
+        - SQLALCHEMY_DATABASE_URL: URL подключения к PostgreSQL
+        - engine: Движок SQLAlchemy для управления пулом подключений
+        - SessionLocal: Фабрика сессий для создания изолированных сессий БД
+        - Base: Базовый класс для ORM-моделей
 
-Пример использования:
-    # Создание модели
-    class User(Base):
-        __tablename__ = "users"
-        id = Column(Integer, primary_key=True)
-        name = Column(String)
+    2. Управление сессиями:
+        - get_db(): Генератор сессий для внедрения зависимостей
+        - Автоматическое закрытие сессий после использования
 
-    # Создание таблиц
-    Base.metadata.create_all(bind=engine)
+Использование:
+    1. Определение моделей:
+        class User(Base):
+            __tablename__ = "users"
+            id = Column(Integer, primary_key=True)
+            name = Column(String)
 
-    # Работа с сессией
-    db = next(get_db())
-    new_user = User(name="John")
-    db.add(new_user)
-    db.commit()
+    2. Создание таблиц:
+        Base.metadata.create_all(bind=engine)
+
+    3. Работа с сессией:
+        @app.get("/users")
+        def get_users(db: Session = Depends(get_db)):
+            users = db.query(User).all()
+            return users
+
+Примечания:
+    - Используйте контекст сессии для автоматического закрытия
+    - Каждый запрос получает свою изолированную сессию
+    - Транзакции автоматически откатываются при ошибках
 """
 
 from sqlalchemy import create_engine

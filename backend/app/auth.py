@@ -40,15 +40,31 @@ from sqlalchemy.orm import Session
 from . import models, schemas, database
 
 
-# Password hashing
+# Password hashing settings
+"""
+Настройки хеширования паролей:
+    - schemes: Используется схема bcrypt для хеширования
+    - deprecated: Автоматическая обработка устаревших схем хеширования
+"""
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT settings
+"""
+Настройки JWT-токенов:
+    - SECRET_KEY: Секретный ключ для подписи токенов, получаемый из переменных окружения
+    - ALGORITHM: Алгоритм шифрования (HS256)
+    - ACCESS_TOKEN_EXPIRE_MINUTES: Время жизни токена в минутах (120)
+"""
 SECRET_KEY = os.environ["JWT_SECRET_KEY"]
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 120
 
-# OAuth2 scheme for token extraction
+# OAuth2 scheme
+"""
+Схема OAuth2:
+    - tokenUrl: URL для получения токена (/login)
+    - Используется для извлечения и валидации токена из заголовка Authorization
+"""
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 

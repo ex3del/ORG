@@ -37,6 +37,7 @@
 
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.responses import FileResponse
 from .database import engine, Base, get_db
 from .models import (
     User,
@@ -396,7 +397,21 @@ def create_chat_session(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    """Create a new chat session for the current user."""
+    """
+    POST /chat_sessions
+    Создание новой чат-сессии для текущего пользователя.
+
+    Описание:
+        Этот эндпоинт позволяет создать новую чат-сессию для аутентифицированного пользователя.
+
+    Аргументы:
+        chat (schemas.ChatSessionCreate): Данные для создания чат-сессии.
+        db (Session): Сессия базы данных для выполнения запросов.
+        current_user (models.User): Аутентифицированный пользователь из JWT-токена.
+
+    Возвращает:
+        schemas.ChatSession: Созданная чат-сессия.
+    """
     new_chat = models.ChatSession(
         user_id=current_user.id,
         session_name=chat.session_name,
@@ -412,7 +427,21 @@ def get_chat_sessions(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    """Get all chat sessions for the current user."""
+    """
+    GET /chat_sessions
+    Получение списка всех чат-сессий текущего пользователя.
+
+    Описание:
+        Этот эндпоинт возвращает список всех чат-сессий для аутентифицированного пользователя,
+        отсортированный по дате создания (от новых к старым).
+
+    Аргументы:
+        db (Session): Сессия базы данных для выполнения запросов.
+        current_user (models.User): Аутентифицированный пользователь из JWT-токена.
+
+    Возвращает:
+        List[schemas.ChatSession]: Список чат-сессий пользователя.
+    """
     return (
         db.query(models.ChatSession)
         .filter(models.ChatSession.user_id == current_user.id)
@@ -428,7 +457,26 @@ def update_chat_session(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    """Update a chat session's name."""
+    """
+    PATCH /chat_sessions/{session_id}
+    Обновление названия чат-сессии.
+
+    Описание:
+        Этот эндпоинт позволяет обновить название существующей чат-сессии.
+        Доступно только владельцу чат-сессии.
+
+    Аргументы:
+        session_id (int): Идентификатор чат-сессии.
+        update_data (schemas.ChatSessionUpdate): Новые данные для обновления.
+        db (Session): Сессия базы данных для выполнения запросов.
+        current_user (models.User): Аутентифицированный пользователь из JWT-токена.
+
+    Возвращает:
+        schemas.ChatSession: Обновленная чат-сессия.
+
+    Ошибки:
+        HTTPException 404: Если чат-сессия не найдена или не принадлежит пользователю.
+    """
     chat = (
         db.query(models.ChatSession)
         .filter(
@@ -454,7 +502,26 @@ def create_message(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    """Add a new message to a chat session."""
+    """
+    POST /chat_sessions/{session_id}/messages
+    Добавление нового сообщения в чат-сессию.
+
+    Описание:
+        Этот эндпоинт позволяет добавить новое сообщение в существующую чат-сессию.
+        Доступно только владельцу чат-сессии.
+
+    Аргументы:
+        session_id (int): Идентификатор чат-сессии.
+        message (schemas.MessageCreate): Данные создаваемого сообщения.
+        db (Session): Сессия базы данных для выполнения запросов.
+        current_user (models.User): Аутентифицированный пользователь из JWT-токена.
+
+    Возвращает:
+        schemas.Message: Созданное сообщение.
+
+    Ошибки:
+        HTTPException 404: Если чат-сессия не найдена или не принадлежит пользователю.
+    """
     chat = (
         db.query(models.ChatSession)
         .filter(
@@ -484,7 +551,25 @@ def delete_chat_session(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    """Delete a chat session and all its messages."""
+    """
+    DELETE /chat_sessions/{session_id}
+    Удаление чат-сессии со всеми сообщениями.
+
+    Описание:
+        Этот эндпоинт позволяет удалить существующую чат-сессию и все её сообщения.
+        Доступно только владельцу чат-сессии.
+
+    Аргументы:
+        session_id (int): Идентификатор чат-сессии.
+        db (Session): Сессия базы данных для выполнения запросов.
+        current_user (models.User): Аутентифицированный пользователь из JWT-токена.
+
+    Возвращает:
+        schemas.ChatSession: Удаленная чат-сессия.
+
+    Ошибки:
+        HTTPException 404: Если чат-сессия не найдена или не принадлежит пользователю.
+    """
     chat = (
         db.query(models.ChatSession)
         .filter(
@@ -509,32 +594,27 @@ async def view_document(
 ):
     """
     GET /view/{file_path}
-    Stream a document file for viewing.
+    Просмотр документа в виде потока данных.
 
-    Description:
-        This endpoint allows an authenticated user to view their uploaded documents.
-        It validates that the requested document belongs to the current user.
+    Описание:
+        Этот эндпоинт позволяет аутентифицированному пользователю просматривать загруженные документы.
+        Проверяет, принадлежит ли запрашиваемый документ текущему пользователю.
 
-    Arguments:
-        file_path (str): The path to the document file.
-        current_user (models.User): The authenticated user from JWT token.
+    Аргументы:
+        file_path (str): Путь к файлу документа.
+        current_user (models.User): Аутентифицированный пользователь из JWT-токена.
 
-    Returns:
-        FileResponse: The document file as a stream.
+    Возвращает:
+        FileResponse: Файл документа в виде потока данных.
 
-    Errors:
-        HTTPException 404: If the document is not found or doesn't belong to the user.
+    Ошибки:
+        HTTPException 404: Если документ не найден.
+        HTTPException 403: Если документ не принадлежит пользователю.
     """
-    # Convert the URL-encoded path back to a normal path
-    from fastapi.responses import FileResponse
-    from fastapi import HTTPException
-    import os
 
-    # Ensure the file exists and is within the user's directory
     user_dir = os.path.join(UPLOAD_DIR, f"user_{current_user.id}")
     full_path = os.path.join(UPLOAD_DIR, file_path)
 
-    # Security check - ensure the file is within the user's directory
     if not os.path.commonprefix([os.path.abspath(full_path), user_dir]).startswith(
         user_dir
     ):
