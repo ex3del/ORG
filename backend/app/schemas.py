@@ -41,7 +41,7 @@ Pydantic схемы для системы аутентификации и упр
 """
 
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -87,3 +87,42 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+
+class ChatSessionBase(BaseModel):
+    session_name: str
+
+
+class ChatSessionCreate(ChatSessionBase):
+    pass
+
+
+class ChatSessionUpdate(ChatSessionBase):
+    pass
+
+
+class MessageBase(BaseModel):
+    message_text: str
+    is_user: bool
+
+
+class MessageCreate(MessageBase):
+    pass
+
+
+class Message(MessageBase):
+    id: int
+    session_id: int
+    timestamp: datetime
+
+    class Config:
+        orm_mode = True
+
+
+class ChatSession(ChatSessionBase):
+    id: int
+    created_at: datetime
+    messages: List[Message] = []
+
+    class Config:
+        orm_mode = True

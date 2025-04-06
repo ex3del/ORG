@@ -70,7 +70,9 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     is_admin = Column(Boolean, default=False)
 
-    documents = relationship("Document", back_populates="user", cascade="all, delete-orphan")
+    documents = relationship(
+        "Document", back_populates="user", cascade="all, delete-orphan"
+    )
     chat_sessions = relationship("ChatSession", back_populates="user")
 
 
@@ -119,7 +121,12 @@ class ChatSession(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="chat_sessions")
-    messages = relationship("Message", back_populates="session")
+    messages = relationship(
+        "Message",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="Message.timestamp",
+    )
 
 
 class Message(Base):

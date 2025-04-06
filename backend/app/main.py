@@ -46,7 +46,8 @@ from .models import (
 )
 from sqlalchemy.orm import Session
 from . import models, schemas, auth, database
-from typing import List
+from typing import List, Optional
+from datetime import datetime
 import logging
 import os
 import shutil
@@ -387,3 +388,91 @@ def delete_document(
     db.delete(document)
     db.commit()
     return document
+
+
+@app.post("/chat_sessions", response_model=schemas.ChatSession)
+def create_chat_session(
+    chat: schemas.ChatSessionCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """Create a new chat session for the current user."""
+    new_chat = models.ChatSession(
+        user_id=current_user.id,
+        session_name=chat.session_name,
+    )
+    db.add(new_chat)
+    db.commit()
+    db.refresh(new_chat)
+    return new_chat
+
+
+@app.get("/chat_sessions", response_model=List[schemas.ChatSession])
+def get_chat_sessions(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """Get all chat sessions for the current user."""
+    return (
+        db.query(models.ChatSession)
+        .filter(models.ChatSession.user_id == current_user.id)
+        .order_by(models.ChatSession.created_at.desc())
+        .all()
+    )
+
+
+@app.patch("/chat_sessions/{session_id}", response_model=schemas.ChatSession)
+def update_chat_session(
+    session_id: int,
+    update_data: schemas.ChatSessionUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """Update a chat session's name."""
+    chat = (
+        db.query(models.ChatSession)
+        .filter(
+            models.ChatSession.id == session_id,
+            models.ChatSession.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    chat.session_name = update_data.session_name
+    db.commit()
+    db.refresh(chat)
+    return chat
+
+
+@app.post("/chat_sessions/{session_id}/messages", response_model=schemas.Message)
+def create_message(
+    session_id: int,
+    message: schemas.MessageCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """Add a new message to a chat session."""
+    chat = (
+        db.query(models.ChatSession)
+        .filter(
+            models.ChatSession.id == session_id,
+            models.ChatSession.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    new_message = models.Message(
+        session_id=session_id,
+        message_text=message.message_text,
+        is_user=message.is_user,
+    )
+    db.add(new_message)
+    db.commit()
+    db.refresh(new_message)
+    return new_message
