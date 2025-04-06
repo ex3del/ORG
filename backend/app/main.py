@@ -476,3 +476,27 @@ def create_message(
     db.commit()
     db.refresh(new_message)
     return new_message
+
+
+@app.delete("/chat_sessions/{session_id}", response_model=schemas.ChatSession)
+def delete_chat_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """Delete a chat session and all its messages."""
+    chat = (
+        db.query(models.ChatSession)
+        .filter(
+            models.ChatSession.id == session_id,
+            models.ChatSession.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    db.delete(chat)
+    db.commit()
+    return chat

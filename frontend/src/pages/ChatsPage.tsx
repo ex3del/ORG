@@ -1,5 +1,11 @@
-import { AddIcon, ChatIcon, EditIcon, HamburgerIcon } from '@chakra-ui/icons';
+import { AddIcon, ChatIcon, DeleteIcon, EditIcon, HamburgerIcon } from '@chakra-ui/icons';
 import {
+    AlertDialog,
+    AlertDialogBody,
+    AlertDialogContent,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogOverlay,
     Box,
     Button,
     Drawer,
@@ -15,9 +21,10 @@ import {
     List,
     ListItem,
     Text,
+    useBoolean,
     useBreakpointValue,
     useDisclosure,
-    useToast
+    useToast,
 } from '@chakra-ui/react';
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useEffect, useRef, useState } from 'react';
@@ -49,6 +56,10 @@ const ChatsPage: React.FC = () => {
     const isMobile = useBreakpointValue({ base: true, md: false });
     const inputRef = useRef<HTMLInputElement>(null);
     const chatListRef = useRef<HTMLDivElement>(null);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [chatToDelete, setChatToDelete] = useState<number | null>(null);
+    const [isSidebarVisible, setIsSidebarVisible] = useBoolean(false);
+    const cancelRef = useRef<HTMLButtonElement>(null) as React.RefObject<HTMLButtonElement>;
 
     useEffect(() => {
         fetchChats();
@@ -191,6 +202,49 @@ const ChatsPage: React.FC = () => {
         }
     };
 
+    const deleteChat = async (chatId: number) => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/chat_sessions/${chatId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                setChats(prevChats => prevChats.filter(chat => chat.id !== chatId));
+                if (selectedChat?.id === chatId) {
+                    setSelectedChat(null);
+                }
+                toast({
+                    title: "Success",
+                    description: "Chat deleted successfully",
+                    status: "success",
+                    duration: 3000,
+                    isClosable: true,
+                });
+            }
+        } catch (error) {
+            console.error('Error deleting chat:', error);
+            toast({
+                title: "Error",
+                description: "Failed to delete chat",
+                status: "error",
+                duration: 3000,
+                isClosable: true,
+            });
+        }
+        setIsDeleteDialogOpen(false);
+        setChatToDelete(null);
+    };
+
+    const handleDeleteClick = (e: React.MouseEvent, chatId: number) => {
+        e.stopPropagation();
+        setChatToDelete(chatId);
+        setIsDeleteDialogOpen(true);
+    };
+
     const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>, chatId: number, name: string) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -199,77 +253,81 @@ const ChatsPage: React.FC = () => {
     };
 
     const ChatSidebar = () => (
-        <Box
-            w={isMobile ? "full" : "300px"}
+        <MotionBox
+            position={isMobile ? "relative" : "absolute"}
+            left={0}
+            top={0}
             h="full"
-            borderRight="1px"
-            borderColor="gray.600"
-            bg="gray.800"
-            overflowY="auto"
-            ref={chatListRef}
+            initial={{ x: isMobile ? 0 : "-100%" }}
+            animate={{ x: (isSidebarVisible || isMobile) ? 0 : "-100%" }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            zIndex={2}
         >
-            <Flex direction="column" h="full">
-                <Flex
-                    justify="space-between"
-                    align="center"
-                    p={4}
-                    borderBottom="1px"
-                    borderColor="gray.600"
-                    bg="gray.900"
-                >
-                    <Heading size="md" color="gray.100">Chats</Heading>
-                    <IconButton
-                        aria-label="New chat"
-                        icon={<AddIcon />}
-                        onClick={createNewChat}
-                        size="sm"
-                        colorScheme="blue"
-                    />
-                </Flex>
-                <List spacing={1} p={2} overflowY="auto" flex={1}>
-                    <AnimatePresence>
+            <Box
+                w="300px"
+                h="full"
+                borderRight="1px"
+                borderColor="gray.600"
+                bg="gray.800"
+                overflowY="auto"
+                ref={chatListRef}
+            >
+                <Flex direction="column" h="full">
+                    <Flex
+                        justify="space-between"
+                        align="center"
+                        p={4}
+                        borderBottom="1px"
+                        borderColor="gray.600"
+                        bg="gray.900"
+                    >
+                        <Heading size="md" color="gray.100">Chats</Heading>
+                        <IconButton
+                            aria-label="New chat"
+                            icon={<AddIcon />}
+                            onClick={createNewChat}
+                            size="sm"
+                            colorScheme="blue"
+                        />
+                    </Flex>
+                    <List spacing={1} p={2} overflowY="auto" flex={1}>
                         {chats.map((chat) => (
-                            <MotionBox
+                            <ListItem
                                 key={chat.id}
-                                initial={{ opacity: 0, y: -20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                transition={{ duration: 0.2 }}
+                                p={2}
+                                bg={selectedChat?.id === chat.id ? 'gray.700' : 'transparent'}
+                                borderRadius="md"
+                                cursor="pointer"
+                                _hover={{ bg: selectedChat?.id === chat.id ? 'gray.700' : 'gray.600' }}
+                                onClick={() => {
+                                    setSelectedChat(chat);
+                                    if (isMobile) onClose();
+                                }}
                             >
-                                <ListItem
-                                    p={2}
-                                    bg={selectedChat?.id === chat.id ? 'gray.700' : 'transparent'}
-                                    borderRadius="md"
-                                    cursor="pointer"
-                                    _hover={{ bg: selectedChat?.id === chat.id ? 'gray.700' : 'gray.700' }}
-                                    onClick={() => {
-                                        setSelectedChat(chat);
-                                        if (isMobile) onClose();
-                                    }}
-                                >
-                                    <Flex align="center" justify="space-between">
-                                        {editingName?.id === chat.id ? (
-                                            <Input
-                                                value={editingName.name}
-                                                onChange={(e) => setEditingName({ ...editingName, name: e.target.value })}
-                                                onBlur={() => updateChatName(chat.id, editingName.name)}
-                                                onKeyPress={(e) => handleKeyPress(e, chat.id, editingName.name)}
-                                                size="sm"
-                                                ref={inputRef}
-                                                autoFocus
-                                                color="white"
-                                                bg="gray.700"
-                                                _focus={{
-                                                    bg: "gray.700",
-                                                    borderColor: "blue.500"
-                                                }}
-                                            />
-                                        ) : (
-                                            <>
-                                                <Flex align="center" flex={1}>
-                                                    <Icon as={ChatIcon} mr={2} color="gray.300" />
-                                                    <Text isTruncated color="gray.100">{chat.session_name}</Text>
-                                                </Flex>
+                                <Flex align="center" justify="space-between">
+                                    {editingName?.id === chat.id ? (
+                                        <Input
+                                            value={editingName.name}
+                                            onChange={(e) => setEditingName({ ...editingName, name: e.target.value })}
+                                            onBlur={() => updateChatName(chat.id, editingName.name)}
+                                            onKeyPress={(e) => handleKeyPress(e, chat.id, editingName.name)}
+                                            size="sm"
+                                            ref={inputRef}
+                                            autoFocus
+                                            color="white"
+                                            bg="gray.700"
+                                            _focus={{
+                                                bg: "gray.700",
+                                                borderColor: "blue.500"
+                                            }}
+                                        />
+                                    ) : (
+                                        <>
+                                            <Flex align="center" flex={1}>
+                                                <Icon as={ChatIcon} mr={2} color="gray.300" />
+                                                <Text isTruncated color="gray.100">{chat.session_name}</Text>
+                                            </Flex>
+                                            <Flex>
                                                 <IconButton
                                                     aria-label="Edit chat name"
                                                     icon={<EditIcon />}
@@ -281,126 +339,188 @@ const ChatsPage: React.FC = () => {
                                                         setEditingName({ id: chat.id, name: chat.session_name });
                                                     }}
                                                 />
-                                            </>
-                                        )}
-                                    </Flex>
-                                </ListItem>
-                            </MotionBox>
+                                                <IconButton
+                                                    aria-label="Delete chat"
+                                                    icon={<DeleteIcon />}
+                                                    size="xs"
+                                                    variant="ghost"
+                                                    colorScheme="red"
+                                                    ml={1}
+                                                    onClick={(e) => handleDeleteClick(e, chat.id)}
+                                                />
+                                            </Flex>
+                                        </>
+                                    )}
+                                </Flex>
+                            </ListItem>
                         ))}
-                    </AnimatePresence>
-                </List>
-            </Flex>
-        </Box>
+                    </List>
+                </Flex>
+            </Box>
+        </MotionBox>
     );
 
     return (
-        <Flex h="calc(100vh - 120px)" bg="gray.900">
-            {isMobile ? (
-                <>
+        <Box position="relative" h="calc(100vh - 120px)">
+            <Flex h="full" bg="gray.900">
+                {!isMobile && (
                     <IconButton
-                        aria-label="Open chats"
+                        aria-label="Toggle chats"
                         icon={<HamburgerIcon />}
                         position="fixed"
                         top="80px"
-                        left={4}
-                        onClick={onOpen}
+                        left={isSidebarVisible ? "310px" : "10px"}
+                        onClick={setIsSidebarVisible.toggle}
                         colorScheme="blue"
+                        zIndex={3}
+                        transition="left 0.3s ease-in-out"
                     />
-                    <Drawer isOpen={isOpen} placement="left" onClose={onClose}>
-                        <DrawerOverlay>
-                            <DrawerContent bg="gray.800">
-                                <DrawerHeader borderBottomWidth="1px" color="gray.100">Chats</DrawerHeader>
-                                <DrawerBody p={0}>
-                                    <ChatSidebar />
-                                </DrawerBody>
-                            </DrawerContent>
-                        </DrawerOverlay>
-                    </Drawer>
-                </>
-            ) : (
-                <ChatSidebar />
-            )}
+                )}
 
-            <Flex flex={1} direction="column" bg="gray.900">
-                <AnimatePresence mode="wait">
-                    {selectedChat ? (
-                        <MotionFlex
-                            key="chat"
-                            flex={1}
-                            direction="column"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                        >
-                            <Box flex={1} p={4} overflowY="auto">
-                                {selectedChat.messages.map((message, index) => (
-                                    <MotionFlex
-                                        key={index}
-                                        justify={message.is_user ? 'flex-end' : 'flex-start'}
-                                        mb={4}
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.3 }}
-                                    >
-                                        <Box
-                                            maxW="70%"
-                                            bg={message.is_user ? 'blue.600' : 'gray.700'}
-                                            color="white"
-                                            p={3}
-                                            borderRadius="lg"
-                                        >
-                                            <Text>{message.message_text}</Text>
-                                        </Box>
-                                    </MotionFlex>
-                                ))}
-                            </Box>
-                            <Box p={4} borderTop="1px" borderColor="gray.700">
-                                <form onSubmit={sendMessage}>
-                                    <Flex gap={2}>
-                                        <Input
-                                            value={newMessage}
-                                            onChange={(e) => setNewMessage(e.target.value)}
-                                            placeholder="Type your message..."
-                                            bg="gray.800"
-                                            color="white"
-                                            _placeholder={{ color: 'gray.400' }}
-                                            _focus={{
-                                                borderColor: "blue.500",
-                                                bg: "gray.800"
-                                            }}
-                                        />
-                                        <Button type="submit" colorScheme="blue">
-                                            Send
-                                        </Button>
-                                    </Flex>
-                                </form>
-                            </Box>
-                        </MotionFlex>
-                    ) : (
-                        <MotionFlex
-                            key="empty"
-                            justify="center"
-                            align="center"
-                            h="full"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                        >
-                            <Button
-                                leftIcon={<AddIcon />}
-                                onClick={createNewChat}
-                                colorScheme="blue"
-                                size="lg"
+                {isMobile ? (
+                    <>
+                        <IconButton
+                            aria-label="Open chats"
+                            icon={<HamburgerIcon />}
+                            position="fixed"
+                            top="80px"
+                            left={4}
+                            onClick={onOpen}
+                            colorScheme="blue"
+                            zIndex={3}
+                        />
+                        <Drawer isOpen={isOpen} placement="left" onClose={onClose}>
+                            <DrawerOverlay>
+                                <DrawerContent bg="gray.800">
+                                    <DrawerHeader borderBottomWidth="1px" color="gray.100">Chats</DrawerHeader>
+                                    <DrawerBody p={0}>
+                                        <ChatSidebar />
+                                    </DrawerBody>
+                                </DrawerContent>
+                            </DrawerOverlay>
+                        </Drawer>
+                    </>
+                ) : (
+                    <ChatSidebar />
+                )}
+
+                <Flex flex={1} direction="column" ml={isMobile ? 0 : "0px"}>
+                    <AnimatePresence mode="wait">
+                        {selectedChat ? (
+                            <MotionFlex
+                                key="chat"
+                                flex={1}
+                                direction="column"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.2 }}
                             >
-                                Start a new chat
-                            </Button>
-                        </MotionFlex>
-                    )}
-                </AnimatePresence>
+                                <Box flex={1} p={4} overflowY="auto">
+                                    {selectedChat.messages.map((message, index) => (
+                                        <MotionFlex
+                                            key={index}
+                                            justify={message.is_user ? 'flex-end' : 'flex-start'}
+                                            mb={4}
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.3 }}
+                                        >
+                                            <Box
+                                                maxW="70%"
+                                                bg={message.is_user ? 'blue.600' : 'gray.700'}
+                                                color="white"
+                                                p={3}
+                                                borderRadius="lg"
+                                            >
+                                                <Text>{message.message_text}</Text>
+                                            </Box>
+                                        </MotionFlex>
+                                    ))}
+                                </Box>
+                                <Box p={4} borderTop="1px" borderColor="gray.700">
+                                    <form onSubmit={sendMessage}>
+                                        <Flex gap={2}>
+                                            <Input
+                                                value={newMessage}
+                                                onChange={(e) => setNewMessage(e.target.value)}
+                                                placeholder="Type your message..."
+                                                bg="gray.800"
+                                                color="white"
+                                                _placeholder={{ color: 'gray.400' }}
+                                                _focus={{
+                                                    borderColor: "blue.500",
+                                                    bg: "gray.800"
+                                                }}
+                                            />
+                                            <Button type="submit" colorScheme="blue">
+                                                Send
+                                            </Button>
+                                        </Flex>
+                                    </form>
+                                </Box>
+                            </MotionFlex>
+                        ) : (
+                            <MotionFlex
+                                key="empty"
+                                justify="center"
+                                align="center"
+                                h="full"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                            >
+                                <Button
+                                    leftIcon={<AddIcon />}
+                                    onClick={createNewChat}
+                                    colorScheme="blue"
+                                    size="lg"
+                                >
+                                    Start a new chat
+                                </Button>
+                            </MotionFlex>
+                        )}
+                    </AnimatePresence>
+                </Flex>
             </Flex>
-        </Flex>
+
+            <AlertDialog
+                isOpen={isDeleteDialogOpen}
+                leastDestructiveRef={cancelRef}
+                onClose={() => {
+                    setIsDeleteDialogOpen(false);
+                    setChatToDelete(null);
+                }}
+            >
+                <AlertDialogOverlay>
+                    <AlertDialogContent bg="gray.800" color="white">
+                        <AlertDialogHeader>Delete Chat</AlertDialogHeader>
+                        <AlertDialogBody>
+                            Are you sure? This action cannot be undone.
+                        </AlertDialogBody>
+                        <AlertDialogFooter>
+                            <Button
+                                ref={cancelRef}
+                                onClick={() => {
+                                    setIsDeleteDialogOpen(false);
+                                    setChatToDelete(null);
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                colorScheme="red"
+                                onClick={() => chatToDelete && deleteChat(chatToDelete)}
+                                ml={3}
+                            >
+                                Delete
+                            </Button>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialogOverlay>
+            </AlertDialog>
+        </Box>
     );
 };
 
