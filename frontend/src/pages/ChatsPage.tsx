@@ -60,16 +60,25 @@ const ChatsPage: React.FC = () => {
     const [chatToDelete, setChatToDelete] = useState<number | null>(null);
     const [isSidebarVisible, setIsSidebarVisible] = useBoolean(false);
     const cancelRef = useRef<HTMLButtonElement>(null) as React.RefObject<HTMLButtonElement>;
+    const [sidebarLocked, setSidebarLocked] = useState(false);
 
     useEffect(() => {
         fetchChats();
     }, []);
 
     useEffect(() => {
-        if (!isMobile && selectedChat) {
+        if (!isMobile && selectedChat && !sidebarLocked) {
             setIsSidebarVisible.off();
         }
     }, [selectedChat, isMobile]);
+
+    useEffect(() => {
+        if (editingName !== null) {
+            setSidebarLocked(true);
+        } else {
+            setSidebarLocked(false);
+        }
+    }, [editingName]);
 
     const fetchChats = async () => {
         try {
@@ -258,18 +267,33 @@ const ChatsPage: React.FC = () => {
         }
     };
 
+    const handleSidebarToggle = () => {
+        setIsSidebarVisible.toggle();
+    };
+
+    const handleStartEditing = (e: React.MouseEvent, chatId: number, name: string) => {
+        e.stopPropagation();
+        setEditingName({ id: chatId, name });
+        setSidebarLocked(true);
+    };
+
     const ChatSidebar = () => (
         <MotionBox
             position="fixed"
             left={0}
             top="64px" // Account for navigation bar height
             h="calc(100vh - 64px)" // Adjust height to account for navigation
-            initial={{ x: "-100%" }}
-            animate={{ x: (isSidebarVisible || isMobile) ? 0 : "-100%" }}
+            initial={false}
+            animate={{
+                x: (isSidebarVisible || isMobile) ? 0 : "-100%"
+            }}
             transition={{
                 type: "spring",
                 stiffness: 300,
                 damping: 30
+            }}
+            style={{
+                pointerEvents: sidebarLocked ? "auto" : "auto"
             }}
             zIndex={1} // Set lower than navigation bar
         >
@@ -330,6 +354,7 @@ const ChatsPage: React.FC = () => {
                                                 bg: "gray.700",
                                                 borderColor: "blue.500"
                                             }}
+                                            onClick={(e) => e.stopPropagation()}
                                         />
                                     ) : (
                                         <>
@@ -344,10 +369,7 @@ const ChatsPage: React.FC = () => {
                                                     size="xs"
                                                     variant="ghost"
                                                     colorScheme="blue"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setEditingName({ id: chat.id, name: chat.session_name });
-                                                    }}
+                                                    onClick={(e) => handleStartEditing(e, chat.id, chat.session_name)}
                                                 />
                                                 <IconButton
                                                     aria-label="Delete chat"
@@ -380,7 +402,7 @@ const ChatsPage: React.FC = () => {
                         position="fixed"
                         top="80px"
                         left={isSidebarVisible ? "310px" : "10px"}
-                        onClick={setIsSidebarVisible.toggle}
+                        onClick={handleSidebarToggle}
                         colorScheme="blue"
                         zIndex={2}
                         transition="all 0.3s ease-in-out"
@@ -417,8 +439,9 @@ const ChatsPage: React.FC = () => {
                 <MotionFlex
                     flex={1}
                     direction="column"
-                    ml={isMobile ? 0 : isSidebarVisible ? "300px" : "0px"}
+                    ml={isMobile ? 0 : (isSidebarVisible ? "300px" : "0px")}
                     pt="64px" // Add padding top to account for navigation
+                    style={{ marginLeft: isMobile ? 0 : (isSidebarVisible ? "300px" : "0px") }}
                     transition={{
                         type: "spring",
                         stiffness: 300,
