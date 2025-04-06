@@ -65,6 +65,12 @@ const ChatsPage: React.FC = () => {
         fetchChats();
     }, []);
 
+    useEffect(() => {
+        if (!isMobile && selectedChat) {
+            setIsSidebarVisible.off();
+        }
+    }, [selectedChat, isMobile]);
+
     const fetchChats = async () => {
         try {
             const token = localStorage.getItem('token');
@@ -254,14 +260,18 @@ const ChatsPage: React.FC = () => {
 
     const ChatSidebar = () => (
         <MotionBox
-            position={isMobile ? "relative" : "absolute"}
+            position="fixed"
             left={0}
-            top={0}
-            h="full"
-            initial={{ x: isMobile ? 0 : "-100%" }}
+            top="64px" // Account for navigation bar height
+            h="calc(100vh - 64px)" // Adjust height to account for navigation
+            initial={{ x: "-100%" }}
             animate={{ x: (isSidebarVisible || isMobile) ? 0 : "-100%" }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
-            zIndex={2}
+            transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 30
+            }}
+            zIndex={1} // Set lower than navigation bar
         >
             <Box
                 w="300px"
@@ -372,8 +382,8 @@ const ChatsPage: React.FC = () => {
                         left={isSidebarVisible ? "310px" : "10px"}
                         onClick={setIsSidebarVisible.toggle}
                         colorScheme="blue"
-                        zIndex={3}
-                        transition="left 0.3s ease-in-out"
+                        zIndex={2}
+                        transition="all 0.3s ease-in-out"
                     />
                 )}
 
@@ -404,17 +414,31 @@ const ChatsPage: React.FC = () => {
                     <ChatSidebar />
                 )}
 
-                <Flex flex={1} direction="column" ml={isMobile ? 0 : "0px"}>
+                <MotionFlex
+                    flex={1}
+                    direction="column"
+                    ml={isMobile ? 0 : isSidebarVisible ? "300px" : "0px"}
+                    pt="64px" // Add padding top to account for navigation
+                    transition={{
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 30
+                    }}
+                >
                     <AnimatePresence mode="wait">
                         {selectedChat ? (
                             <MotionFlex
                                 key="chat"
                                 flex={1}
                                 direction="column"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.2 }}
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                transition={{
+                                    type: "spring",
+                                    stiffness: 300,
+                                    damping: 30
+                                }}
                             >
                                 <Box flex={1} p={4} overflowY="auto">
                                     {selectedChat.messages.map((message, index) => (
@@ -466,10 +490,14 @@ const ChatsPage: React.FC = () => {
                                 justify="center"
                                 align="center"
                                 h="full"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.2 }}
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                transition={{
+                                    type: "spring",
+                                    stiffness: 300,
+                                    damping: 30
+                                }}
                             >
                                 <Button
                                     leftIcon={<AddIcon />}
@@ -482,7 +510,7 @@ const ChatsPage: React.FC = () => {
                             </MotionFlex>
                         )}
                     </AnimatePresence>
-                </Flex>
+                </MotionFlex>
             </Flex>
 
             <AlertDialog
