@@ -19,7 +19,8 @@ import {
     useDisclosure,
     useToast
 } from '@chakra-ui/react';
-import React, { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface Message {
     id: number;
@@ -35,6 +36,9 @@ interface ChatSession {
     messages: Message[];
 }
 
+const MotionFlex = motion(Flex);
+const MotionBox = motion(Box);
+
 const ChatsPage: React.FC = () => {
     const [chats, setChats] = useState<ChatSession[]>([]);
     const [selectedChat, setSelectedChat] = useState<ChatSession | null>(null);
@@ -43,6 +47,8 @@ const ChatsPage: React.FC = () => {
     const { isOpen, onOpen, onClose } = useDisclosure();
     const toast = useToast();
     const isMobile = useBreakpointValue({ base: true, md: false });
+    const inputRef = useRef<HTMLInputElement>(null);
+    const chatListRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         fetchChats();
@@ -85,7 +91,7 @@ const ChatsPage: React.FC = () => {
 
             if (response.ok) {
                 const newChat = await response.json();
-                setChats([...chats, newChat]);
+                setChats(prevChats => [newChat, ...prevChats]);
                 setSelectedChat(newChat);
                 if (isMobile) {
                     onClose();
@@ -104,6 +110,8 @@ const ChatsPage: React.FC = () => {
     };
 
     const updateChatName = async (chatId: number, newName: string) => {
+        if (!newName.trim()) return;
+
         try {
             const token = localStorage.getItem('token');
             const response = await fetch(`/api/chat_sessions/${chatId}`, {
@@ -122,9 +130,8 @@ const ChatsPage: React.FC = () => {
                     chat.id === chatId ? { ...chat, session_name: newName } : chat
                 ));
                 if (selectedChat?.id === chatId) {
-                    setSelectedChat({ ...selectedChat, session_name: newName });
+                    setSelectedChat(prev => prev ? { ...prev, session_name: newName } : null);
                 }
-                setEditingName(null);
             }
         } catch (error) {
             console.error('Error updating chat name:', error);
@@ -135,6 +142,8 @@ const ChatsPage: React.FC = () => {
                 duration: 3000,
                 isClosable: true,
             });
+        } finally {
+            setEditingName(null);
         }
     };
 
@@ -182,79 +191,110 @@ const ChatsPage: React.FC = () => {
         }
     };
 
+    const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>, chatId: number, name: string) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            updateChatName(chatId, name);
+        }
+    };
+
     const ChatSidebar = () => (
         <Box
             w={isMobile ? "full" : "300px"}
             h="full"
             borderRight="1px"
-            borderColor="gray.200"
-            bg="gray.50"
+            borderColor="gray.600"
+            bg="gray.800"
+            overflowY="auto"
+            ref={chatListRef}
         >
             <Flex direction="column" h="full">
-                <Flex justify="space-between" align="center" p={4} borderBottom="1px" borderColor="gray.200">
-                    <Heading size="md">Chats</Heading>
+                <Flex
+                    justify="space-between"
+                    align="center"
+                    p={4}
+                    borderBottom="1px"
+                    borderColor="gray.600"
+                    bg="gray.900"
+                >
+                    <Heading size="md" color="gray.100">Chats</Heading>
                     <IconButton
                         aria-label="New chat"
                         icon={<AddIcon />}
                         onClick={createNewChat}
                         size="sm"
+                        colorScheme="blue"
                     />
                 </Flex>
                 <List spacing={1} p={2} overflowY="auto" flex={1}>
-                    {chats.map((chat) => (
-                        <ListItem
-                            key={chat.id}
-                            p={2}
-                            bg={selectedChat?.id === chat.id ? 'blue.100' : 'transparent'}
-                            borderRadius="md"
-                            cursor="pointer"
-                            _hover={{ bg: selectedChat?.id === chat.id ? 'blue.100' : 'gray.100' }}
-                            onClick={() => {
-                                setSelectedChat(chat);
-                                if (isMobile) onClose();
-                            }}
-                        >
-                            <Flex align="center" justify="space-between">
-                                {editingName?.id === chat.id ? (
-                                    <Input
-                                        value={editingName.name}
-                                        onChange={(e) => setEditingName({ ...editingName, name: e.target.value })}
-                                        onBlur={() => updateChatName(chat.id, editingName.name)}
-                                        onKeyPress={(e) => {
-                                            if (e.key === 'Enter') {
-                                                updateChatName(chat.id, editingName.name);
-                                            }
-                                        }}
-                                        size="sm"
-                                    />
-                                ) : (
-                                    <>
-                                        <Flex align="center" flex={1}>
-                                            <Icon as={ChatIcon} mr={2} />
-                                            <Text isTruncated>{chat.session_name}</Text>
-                                        </Flex>
-                                        <IconButton
-                                            aria-label="Edit chat name"
-                                            icon={<EditIcon />}
-                                            size="xs"
-                                            variant="ghost"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setEditingName({ id: chat.id, name: chat.session_name });
-                                            }}
-                                        />
-                                    </>
-                                )}
-                            </Flex>
-                        </ListItem>
-                    ))}
+                    <AnimatePresence>
+                        {chats.map((chat) => (
+                            <MotionBox
+                                key={chat.id}
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.2 }}
+                            >
+                                <ListItem
+                                    p={2}
+                                    bg={selectedChat?.id === chat.id ? 'gray.700' : 'transparent'}
+                                    borderRadius="md"
+                                    cursor="pointer"
+                                    _hover={{ bg: selectedChat?.id === chat.id ? 'gray.700' : 'gray.700' }}
+                                    onClick={() => {
+                                        setSelectedChat(chat);
+                                        if (isMobile) onClose();
+                                    }}
+                                >
+                                    <Flex align="center" justify="space-between">
+                                        {editingName?.id === chat.id ? (
+                                            <Input
+                                                value={editingName.name}
+                                                onChange={(e) => setEditingName({ ...editingName, name: e.target.value })}
+                                                onBlur={() => updateChatName(chat.id, editingName.name)}
+                                                onKeyPress={(e) => handleKeyPress(e, chat.id, editingName.name)}
+                                                size="sm"
+                                                ref={inputRef}
+                                                autoFocus
+                                                color="white"
+                                                bg="gray.700"
+                                                _focus={{
+                                                    bg: "gray.700",
+                                                    borderColor: "blue.500"
+                                                }}
+                                            />
+                                        ) : (
+                                            <>
+                                                <Flex align="center" flex={1}>
+                                                    <Icon as={ChatIcon} mr={2} color="gray.300" />
+                                                    <Text isTruncated color="gray.100">{chat.session_name}</Text>
+                                                </Flex>
+                                                <IconButton
+                                                    aria-label="Edit chat name"
+                                                    icon={<EditIcon />}
+                                                    size="xs"
+                                                    variant="ghost"
+                                                    colorScheme="blue"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEditingName({ id: chat.id, name: chat.session_name });
+                                                    }}
+                                                />
+                                            </>
+                                        )}
+                                    </Flex>
+                                </ListItem>
+                            </MotionBox>
+                        ))}
+                    </AnimatePresence>
                 </List>
             </Flex>
         </Box>
     );
 
     return (
-        <Flex h="calc(100vh - 120px)">
+        <Flex h="calc(100vh - 120px)" bg="gray.900">
             {isMobile ? (
                 <>
                     <IconButton
@@ -264,11 +304,12 @@ const ChatsPage: React.FC = () => {
                         top="80px"
                         left={4}
                         onClick={onOpen}
+                        colorScheme="blue"
                     />
                     <Drawer isOpen={isOpen} placement="left" onClose={onClose}>
                         <DrawerOverlay>
-                            <DrawerContent>
-                                <DrawerHeader borderBottomWidth="1px">Chats</DrawerHeader>
+                            <DrawerContent bg="gray.800">
+                                <DrawerHeader borderBottomWidth="1px" color="gray.100">Chats</DrawerHeader>
                                 <DrawerBody p={0}>
                                     <ChatSidebar />
                                 </DrawerBody>
@@ -280,50 +321,84 @@ const ChatsPage: React.FC = () => {
                 <ChatSidebar />
             )}
 
-            <Flex flex={1} direction="column">
-                {selectedChat ? (
-                    <>
-                        <Box flex={1} p={4} overflowY="auto">
-                            {selectedChat.messages.map((message, index) => (
-                                <Flex
-                                    key={index}
-                                    justify={message.is_user ? 'flex-end' : 'flex-start'}
-                                    mb={4}
-                                >
-                                    <Box
-                                        maxW="70%"
-                                        bg={message.is_user ? 'blue.500' : 'gray.200'}
-                                        color={message.is_user ? 'white' : 'black'}
-                                        p={3}
-                                        borderRadius="lg"
+            <Flex flex={1} direction="column" bg="gray.900">
+                <AnimatePresence mode="wait">
+                    {selectedChat ? (
+                        <MotionFlex
+                            key="chat"
+                            flex={1}
+                            direction="column"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                        >
+                            <Box flex={1} p={4} overflowY="auto">
+                                {selectedChat.messages.map((message, index) => (
+                                    <MotionFlex
+                                        key={index}
+                                        justify={message.is_user ? 'flex-end' : 'flex-start'}
+                                        mb={4}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.3 }}
                                     >
-                                        <Text>{message.message_text}</Text>
-                                    </Box>
-                                </Flex>
-                            ))}
-                        </Box>
-                        <Box p={4} borderTop="1px" borderColor="gray.200">
-                            <form onSubmit={sendMessage}>
-                                <Flex gap={2}>
-                                    <Input
-                                        value={newMessage}
-                                        onChange={(e) => setNewMessage(e.target.value)}
-                                        placeholder="Type your message..."
-                                    />
-                                    <Button type="submit" colorScheme="blue">
-                                        Send
-                                    </Button>
-                                </Flex>
-                            </form>
-                        </Box>
-                    </>
-                ) : (
-                    <Flex justify="center" align="center" h="full">
-                        <Button leftIcon={<AddIcon />} onClick={createNewChat}>
-                            Start a new chat
-                        </Button>
-                    </Flex>
-                )}
+                                        <Box
+                                            maxW="70%"
+                                            bg={message.is_user ? 'blue.600' : 'gray.700'}
+                                            color="white"
+                                            p={3}
+                                            borderRadius="lg"
+                                        >
+                                            <Text>{message.message_text}</Text>
+                                        </Box>
+                                    </MotionFlex>
+                                ))}
+                            </Box>
+                            <Box p={4} borderTop="1px" borderColor="gray.700">
+                                <form onSubmit={sendMessage}>
+                                    <Flex gap={2}>
+                                        <Input
+                                            value={newMessage}
+                                            onChange={(e) => setNewMessage(e.target.value)}
+                                            placeholder="Type your message..."
+                                            bg="gray.800"
+                                            color="white"
+                                            _placeholder={{ color: 'gray.400' }}
+                                            _focus={{
+                                                borderColor: "blue.500",
+                                                bg: "gray.800"
+                                            }}
+                                        />
+                                        <Button type="submit" colorScheme="blue">
+                                            Send
+                                        </Button>
+                                    </Flex>
+                                </form>
+                            </Box>
+                        </MotionFlex>
+                    ) : (
+                        <MotionFlex
+                            key="empty"
+                            justify="center"
+                            align="center"
+                            h="full"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                        >
+                            <Button
+                                leftIcon={<AddIcon />}
+                                onClick={createNewChat}
+                                colorScheme="blue"
+                                size="lg"
+                            >
+                                Start a new chat
+                            </Button>
+                        </MotionFlex>
+                    )}
+                </AnimatePresence>
             </Flex>
         </Flex>
     );
