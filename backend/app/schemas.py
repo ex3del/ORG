@@ -74,6 +74,7 @@ class User(UserBase):
     id: int
     is_active: bool
     is_approved: bool
+    is_admin: bool
 
     class Config:
         orm_mode = True  # Allows conversion from SQLAlchemy models

@@ -40,7 +40,19 @@ const Login: React.FC = () => {
             if (response.ok) {
                 const data = await response.json();
                 localStorage.setItem('token', data.access_token);
-                alert('Login successful');
+
+                // Get user data to check if admin
+                const userResponse = await fetch('/api/users/me', {
+                    headers: {
+                        'Authorization': `Bearer ${data.access_token}`
+                    }
+                });
+
+                if (userResponse.ok) {
+                    const userData = await userResponse.json();
+                    localStorage.setItem('isAdmin', userData.is_admin ? 'true' : 'false');
+                }
+
                 navigate('/dashboard');
             } else {
                 const errorData = await response.json();

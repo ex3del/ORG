@@ -16,6 +16,7 @@
    - POST /login - Аутентификация и получение JWT-токена
    - GET /users/me - Получение информации о текущем пользователе
    - POST /approve_user/{user_id} - Одобрение учетной записи пользователя
+   - POST /disapprove_user/{user_id} - Отмена одобрения учетной записи пользователя
 3. Управление документами:
    - POST /upload - Загрузка документа (PDF, ≤20MB, максимум 10 документов на пользователя)
    - GET /documents - Список всех документов текущего пользователя
@@ -214,6 +215,46 @@ def approve_user(
         raise HTTPException(status_code=400, detail="User already approved")
 
     user.is_approved = True
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.post("/disapprove_user/{user_id}", response_model=schemas.User)
+def disapprove_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(auth.get_current_admin_user),
+):
+    """
+    POST /disapprove_user/{user_id}
+    Отмена одобрения учетной записи пользователя администратором.
+
+    Описание:
+        Этот эндпоинт позволяет администратору отменить одобрение учетной записи пользователя.
+        После отмены одобрения пользователь не сможет войти в систему.
+
+    Аргументы:
+        user_id (int): Идентификатор пользователя, для которого нужно отменить одобрение.
+        db (Session): Сессия базы данных для выполнения запросов.
+        admin_user (models.User): Аутентифицированный администратор, выполняющий запрос.
+
+    Возвращает:
+        models.User: Обновленный объект пользователя с отмененным флагом одобрения.
+
+    Ошибки:
+        HTTPException 404: Если пользователь с указанным идентификатором не найден.
+        HTTPException 400: Если пользователь уже не одобрен или является администратором.
+    """
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.is_admin:
+        raise HTTPException(status_code=400, detail="Cannot disapprove admin users")
+    if not user.is_approved:
+        raise HTTPException(status_code=400, detail="User already not approved")
+
+    user.is_approved = False
     db.commit()
     db.refresh(user)
     return user
