@@ -29,12 +29,55 @@ services:
       - ./backend/uploads:/app/uploads
     environment:
       - PYTHONUNBUFFERED=1
-      - JWT_SECRET_KEY=your_jwt_secret_key_here # Add this line
+      - JWT_SECRET_KEY=your_jwt_secret_key_here
     env_file:
       - .env
     depends_on:
       db:
         condition: service_healthy
+    restart: always
+    networks:
+      - app-network
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    restart: always
+    networks:
+      - app-network
+
+  rag:
+    build:
+      context: ./rag
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./rag/app:/app/app
+      - ./rag/data:/app/data
+      - ./rag/models:/app/models
+    environment:
+      - PYTHONUNBUFFERED=1
+      - OLLAMA_HOST=http://ollama:11434
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    depends_on:
+      - ollama
     restart: always
     networks:
       - app-network
@@ -55,3 +98,4 @@ networks:
 
 volumes:
   postgres_data:
+  ollama_data:
