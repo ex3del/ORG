@@ -3,3 +3,6 @@
 __pycache__/
 .env
 rules/.pdf
+rules/.json
+/tools
+rag/app/
