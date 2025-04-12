@@ -2,7 +2,5 @@
 *.pyc
 __pycache__/
 .env
-rules/*.pdf
-rules/*.json
-tools/
-rag/app/
+rules/
+rules.zip
